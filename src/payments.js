@@ -85,6 +85,26 @@ function createPayments({ pool, stripe, secretKey, webhookSecret, appOrigin }) {
       return { ...rows[0], user_id: userId, total_cents: total };
     });
   }
+  async function renewRejectedAttempt(payment) {
+    return c.transaction(pool, async client => {
+      await c.lockUser(client, payment.user_id);
+      const { rows } = await client.query(`SELECT cp.*, o.user_id, o.total_cents, o.status AS order_status FROM checkout_payments cp
+        JOIN orders o ON o.id = cp.order_id WHERE cp.order_id = $1 FOR UPDATE OF cp`, [payment.order_id]);
+      const current = rows[0];
+      // Another retry or webhook may already have advanced this reservation.
+      if (current.attempt_key !== payment.attempt_key || current.session_id || current.reservation_state !== 'reserved') return current;
+      if (current.rejected_attempt_key || current.order_status !== 'pending') {
+        v.fail(503, 'checkout_pending', 'This checkout needs payment-provider reconciliation before retrying.');
+      }
+      const attemptKey = randomUUID();
+      const params = { ...current.create_params,
+        metadata: { ...current.create_params.metadata, paymentAttempt: attemptKey },
+        expires_at: Math.floor(Date.now() / 1000) + 3600 };
+      const result = await client.query(`UPDATE checkout_payments SET rejected_attempt_key = attempt_key, attempt_key = $1, create_params = $2,
+        created_at = now(), updated_at = now() WHERE order_id = $3 RETURNING *`, [attemptKey, params, current.order_id]);
+      return { ...result.rows[0], user_id: current.user_id, total_cents: current.total_cents };
+    });
+  }
   function verifySession(session, payment) {
     if (!session || !/^cs_test_/.test(session.id || '') || session.livemode !== false || session.mode !== 'payment' ||
         session.currency !== 'usd' || session.amount_total !== Number(payment.total_cents) ||
@@ -129,17 +149,26 @@ function createPayments({ pool, stripe, secretKey, webhookSecret, appOrigin }) {
     v.object(req.body, ['cartId', 'note'], ['cartId']);
     const cartId = v.integer(req.body.cartId, 'cartId');
     const note = req.body.note === undefined ? '' : v.text(req.body.note, 'note', 500, 0);
-    const payment = await reserve(req.user.id, cartId, note);
+    let payment = await reserve(req.user.id, cartId, note);
     let session;
-    if (payment.session_id) session = await retrieve(payment.session_id);
-    else {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (payment.session_id) { session = await retrieve(payment.session_id); break; }
       // Do not reuse an idempotency key beyond Stripe's retention window. Unknown
       // outcomes need a trusted webhook/provider reconciliation, never local expiry.
       if (Date.now() - new Date(payment.created_at).getTime() >= 23 * 60 * 60 * 1000) {
         v.fail(503, 'checkout_pending', 'This checkout needs payment-provider reconciliation before retrying.');
       }
-      try { session = await stripe.checkout.sessions.create(payment.create_params, { idempotencyKey: payment.attempt_key }); }
-      catch {
+      try {
+        session = await stripe.checkout.sessions.create(payment.create_params, { idempotencyKey: payment.attempt_key });
+        break;
+      } catch (error) {
+        // Endive's rejected card-only parameter can be cached under the old key.
+        // Only this conclusive validation rejection permits a fresh attempt.
+        if (attempt === 0 && error.statusCode === 400 && error.rawType === 'invalid_request_error' &&
+            error.param === 'payment_method_types') {
+          payment = await renewRejectedAttempt(payment);
+          continue;
+        }
         // Even a timeout or 500 can occur after Stripe created a payable session.
         // Retain the same reservation and key; a retry or webhook can recover it.
         v.fail(503, 'checkout_pending', 'Checkout could not be confirmed. Retry the same cart to safely recover it.');

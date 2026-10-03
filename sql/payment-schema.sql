@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS checkout_payments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (reservation_state <> 'reserved' OR cart_id IS NOT NULL)
 );
+ALTER TABLE checkout_payments ADD COLUMN IF NOT EXISTS rejected_attempt_key UUID;
 CREATE UNIQUE INDEX IF NOT EXISTS checkout_payments_one_reservation_per_cart
   ON checkout_payments(cart_id) WHERE reservation_state = 'reserved';
 COMMIT;

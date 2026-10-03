@@ -283,6 +283,100 @@ test('failed creation before a response never locally assumes payment is impossi
   assert.equal(await stock(productId), 3);
 });
 
+function rejectedCardParameter() {
+  return new Stripe.errors.StripeInvalidRequestError({ statusCode: 400,
+    type: 'invalid_request_error', param: 'payment_method_types', message: 'The parameter is no longer supported.' });
+}
+
+test('concurrent retries renew a cached card-parameter rejection once without changing the reservation', async () => {
+  const { agent } = await shopper();
+  const productId = await product();
+  const cartId = await cart(agent, productId);
+  provider.failBeforeCreate = true;
+  await agent.post(base).send({ cartId, note: 'Keep this order' }).expect(503);
+  provider.failBeforeCreate = false;
+  const expiredAt = Math.floor(Date.now() / 1000) - 3600;
+  const { rows: [original] } = await pool.query(`UPDATE checkout_payments SET created_at = now() - interval '2 hours',
+    create_params = jsonb_set(create_params, '{expires_at}', to_jsonb($1::bigint)) RETURNING *`, [expiredAt]);
+  const create = provider.checkout.sessions.create;
+  let rejectedCalls = 0, replacementCalls = 0, releaseOldRequests;
+  const oldRequestsArrived = new Promise(resolve => { releaseOldRequests = resolve; });
+  provider.checkout.sessions.create = async (params, options) => {
+    if (options.idempotencyKey === original.attempt_key) {
+      assert.deepEqual(params, original.create_params);
+      if (++rejectedCalls === 2) releaseOldRequests();
+      await oldRequestsArrived;
+      throw rejectedCardParameter();
+    }
+    replacementCalls++;
+    return create(params, options);
+  };
+  const results = await Promise.all([agent.post(base).send({ cartId }), agent.post(base).send({ cartId })]);
+  assert.deepEqual(results.map(result => result.status), [201, 201]);
+  assert.equal(results[0].body.sessionId, results[1].body.sessionId);
+  assert.equal(rejectedCalls, 2);
+  assert.ok(replacementCalls >= 1 && replacementCalls <= 2);
+  const { rows: [renewed] } = await pool.query('SELECT * FROM checkout_payments');
+  assert.equal(renewed.order_id, original.order_id);
+  assert.equal(renewed.cart_id, original.cart_id);
+  assert.equal(renewed.rejected_attempt_key, original.attempt_key);
+  assert.notEqual(renewed.attempt_key, original.attempt_key);
+  assert.equal(renewed.reservation_state, 'reserved');
+  assert.ok(renewed.created_at > original.created_at);
+  assert.ok(renewed.create_params.expires_at >= Math.floor(Date.now() / 1000) + 3500);
+  assert.deepEqual(renewed.create_params, { ...original.create_params,
+    metadata: { ...original.create_params.metadata, paymentAttempt: renewed.attempt_key },
+    expires_at: renewed.create_params.expires_at });
+  assert.equal(provider.requests.size, 1);
+  assert.equal(provider.sessions.size, 1);
+  assert.equal(await stock(productId), 3);
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM orders')).rows[0].n, 1);
+  assert.equal((await agent.get(`/api/orders/${original.order_id}`)).body.order.note, 'Keep this order');
+  assert.equal((await agent.get(`/api/carts/${cartId}`)).body.cart.items[0].quantity, 2);
+});
+
+test('a rejected replacement is retained for reconciliation rather than rotating again', async () => {
+  const { agent } = await shopper();
+  const productId = await product();
+  const cartId = await cart(agent, productId);
+  const attemptedKeys = [];
+  provider.checkout.sessions.create = async (params, options) => {
+    attemptedKeys.push(options.idempotencyKey);
+    throw rejectedCardParameter();
+  };
+  await agent.post(base).send({ cartId }).expect(503);
+  const { rows: [first] } = await pool.query('SELECT * FROM checkout_payments');
+  await agent.post(base).send({ cartId }).expect(503);
+  const { rows: [second] } = await pool.query('SELECT * FROM checkout_payments');
+  assert.deepEqual(second, first);
+  assert.deepEqual(attemptedKeys, [first.rejected_attempt_key, first.attempt_key, first.attempt_key]);
+  assert.equal(await stock(productId), 3);
+  assert.equal(provider.sessions.size, 0);
+});
+
+test('other validation, idempotency, server and network errors never renew the attempt', async () => {
+  const { agent } = await shopper();
+  const productId = await product();
+  const cartId = await cart(agent, productId);
+  const errors = [
+    new Stripe.errors.StripeInvalidRequestError({ statusCode: 400, type: 'invalid_request_error', param: 'expires_at' }),
+    new Stripe.errors.StripeIdempotencyError({ statusCode: 400, type: 'idempotency_error', param: 'payment_method_types' }),
+    new Stripe.errors.StripeAPIError({ statusCode: 500, type: 'api_error', param: 'payment_method_types' }),
+    new Error('Injected connection loss')
+  ];
+  let original;
+  for (const error of errors) {
+    provider.checkout.sessions.create = async () => { throw error; };
+    await agent.post(base).send({ cartId }).expect(503);
+    const { rows: [payment] } = await pool.query('SELECT * FROM checkout_payments');
+    original ||= payment;
+    assert.deepEqual(payment, original);
+    assert.equal(payment.rejected_attempt_key, null);
+  }
+  assert.equal(await stock(productId), 3);
+  assert.equal(provider.sessions.size, 0);
+});
+
 test('concurrent customers cannot reserve the last stock twice', async () => {
   const first = await shopper(), second = await shopper();
   const productId = await product(1);
