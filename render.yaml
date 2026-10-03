@@ -1,0 +1,31 @@
+# Prepared deployment blueprint. Applying it provisions public hosting and a DB;
+# do so only after approval. GitHub/Stripe credentials are optional manual settings.
+services:
+  - type: web
+    name: course-ecommerce-client
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm --prefix client ci --include=dev && npm --prefix client run build
+    startCommand: npm run db:deploy && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGIN
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: course-ecommerce-db
+          property: connectionString
+    # Add optional GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_CALLBACK_URL,
+    # STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET privately in the dashboard.
+
+databases:
+  - name: course-ecommerce-db
+    plan: free
+    databaseName: ecommerce_course
+    user: ecommerce_app

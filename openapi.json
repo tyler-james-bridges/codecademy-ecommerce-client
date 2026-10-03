@@ -1,0 +1,1894 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Local E-commerce API",
+    "version": "1.0.0",
+    "description": "Local storefront API with cookie sessions, owner-scoped carts and orders, and administrator product management. Missing login returns 401; denied administrator operations return 403; other users’ protected resources return 404. Request objects reject unknown fields. Send bodies as application/json; the JSON body limit is 64 KB. Mutating requests with an Origin header must match the configured application origin (http://localhost:3002 by default), otherwise 403. Text length limits use JavaScript UTF-16 code units; schema maxLength values approximate those limits for non-BMP characters. Passwords instead use exact UTF-8 byte limits. Money uses integer cents. Checkout and refunds are simulated: no real charges and no payment card data. Documentation: /docs. Raw specification: /openapi.json."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3002"
+    }
+  ],
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Products"
+    },
+    {
+      "name": "Carts"
+    },
+    {
+      "name": "Orders"
+    },
+    {
+      "name": "Documentation"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "register",
+        "summary": "Register an account",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Creates an account with role user and signs the new user in, issuing the ecommerce.sid session cookie. Duplicate usernames return 409. Unknown fields, including role, return 400.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "login",
+        "summary": "Log in and start a session",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Sets the ecommerce.sid session cookie on successful login.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "logout",
+        "summary": "Log out of the current session",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "security": [],
+        "description": "Destroys the current session and clears ecommerce.sid. Also succeeds when no authenticated session exists. No body is required."
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "operationId": "getCurrentUser",
+        "summary": "Get the authenticated user",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "listUsers",
+        "summary": "List users (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "getUser",
+        "summary": "Get your account or, as admin, another account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "updateUser",
+        "summary": "Update your own account",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Provide at least one of username, displayName, or password. Only the owner may update an account. Supplying username or password requires the correct currentPassword; an incorrect current password returns 401. A password change revokes other sessions and issues a fresh session for the current client. Unknown fields, including role, return 400. Duplicate usernames return 409. Administrators may only update their own account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "deleteUser",
+        "summary": "Soft-delete your own account",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Only the account owner may delete this resource. Returns 409 if the account has any placed orders. Successful deletion removes the cart, soft-deletes the account, revokes its sessions, and clears the current cookie."
+      }
+    },
+    "/api/products": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "operationId": "listProducts",
+        "summary": "List products",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [],
+        "description": "Lists active products only, ordered by ID."
+      },
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "operationId": "createProduct",
+        "summary": "Create a product (admin only)",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Duplicate SKUs return 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "operationId": "getProduct",
+        "summary": "Get a product",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [],
+        "description": "Inactive and nonexistent products return 404."
+      },
+      "put": {
+        "tags": [
+          "Products"
+        ],
+        "operationId": "updateProduct",
+        "summary": "Update a product (admin only)",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Duplicate SKUs return 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdateRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Products"
+        ],
+        "operationId": "deleteProduct",
+        "summary": "Soft-delete a product (admin only)",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "description": "Marks the active product inactive. Already inactive or nonexistent products return 404."
+      }
+    },
+    "/api/carts": {
+      "get": {
+        "tags": [
+          "Carts"
+        ],
+        "operationId": "listCarts",
+        "summary": "List your carts",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Carts"
+        ],
+        "operationId": "createCart",
+        "summary": "Create your cart",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Send an empty JSON object or omit the body. Each user may have one cart; creating a second returns 409.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyObject"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/carts/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Carts"
+        ],
+        "operationId": "getCart",
+        "summary": "Get your cart",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Carts"
+        ],
+        "operationId": "replaceCartItems",
+        "summary": "Replace every item in your cart",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Accepts up to 100 distinct products, each with quantity 1–99. An empty items array clears the cart. Missing or inactive products return 404; insufficient stock returns 409. Replacement is atomic.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartUpdateRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Carts"
+        ],
+        "operationId": "deleteCart",
+        "summary": "Delete your cart",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/carts/{id}/checkout": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "checkoutCart",
+        "summary": "Check out your cart",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Alias for POST /api/orders with cartId taken from the path. Checks out the authenticated user’s cart using simulated payment only. A simulated failure returns 402 and leaves the cart, stock, and orders unchanged. An empty cart, insufficient stock, or an inactive product returns 409. No payment card data is accepted and no real charge is made. The body is optional; omitted payment simulation defaults to success and omitted note defaults to an empty string.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "listOrders",
+        "summary": "List your orders",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "createOrder",
+        "summary": "Check out your cart and create an order",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PaymentRequired"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "description": "Checks out the authenticated user’s cart using simulated payment only. A simulated failure returns 402 and leaves the cart, stock, and orders unchanged. An empty cart, insufficient stock, or an inactive product returns 409. No payment card data is accepted and no real charge is made. cartId is required; omitted payment simulation defaults to success and omitted note defaults to an empty string.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/Id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "getOrder",
+        "summary": "Get your order",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "updateOrder",
+        "summary": "Update the note or cancel your order",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderUpdateRequest"
+              }
+            }
+          }
+        },
+        "description": "Provide status cancelled, a note, or both. Empty objects and any other status return 400. Cancellation restores stock exactly once and sets paymentStatus to simulated_refunded; cancelled orders cannot be reactivated."
+      },
+      "delete": {
+        "tags": [
+          "Orders"
+        ],
+        "operationId": "deleteOrder",
+        "summary": "Soft-delete your cancelled order",
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        },
+        "description": "Only cancelled orders may be deleted. Placed orders return 409."
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": [
+          "Documentation"
+        ],
+        "operationId": "getDocumentation",
+        "summary": "View API documentation",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API documentation page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Documentation"
+        ],
+        "operationId": "getOpenApiDocument",
+        "summary": "Get this OpenAPI document",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3 document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Documentation"
+        ],
+        "operationId": "getHealth",
+        "summary": "Check application and database availability",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Application and database are available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "ecommerce.sid",
+        "description": "HTTP-only session cookie issued by successful registration or login. SameSite=Lax, seven-day lifetime, and Secure in production. Send it on authenticated requests. Password changes revoke other sessions and replace the current client’s session."
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "description": "Positive decimal resource ID from 1 to 2147483647. Invalid syntax, including leading zeroes, and out-of-range values return 404."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Password": {
+        "type": "string",
+        "format": "password",
+        "writeOnly": true,
+        "maxLength": 72,
+        "description": "Must contain 12–72 UTF-8 bytes. maxLength is a character-count approximation of the upper bound; the server enforces the exact byte limits."
+      },
+      "CredentialPassword": {
+        "$ref": "#/components/schemas/Password"
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "pattern": "^[a-z0-9_-]{3,32}$"
+          },
+          "displayName": {
+            "$ref": "#/components/schemas/DisplayName"
+          },
+          "role": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Assigned by the server; clients cannot set or change roles.",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "role",
+          "createdAt"
+        ]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "$ref": "#/components/schemas/Username"
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          },
+          "displayName": {
+            "$ref": "#/components/schemas/DisplayName"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "displayName"
+        ],
+        "additionalProperties": false
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "$ref": "#/components/schemas/Username"
+          },
+          "password": {
+            "$ref": "#/components/schemas/CredentialPassword"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "$ref": "#/components/schemas/Username"
+          },
+          "displayName": {
+            "$ref": "#/components/schemas/DisplayName"
+          },
+          "password": {
+            "$ref": "#/components/schemas/Password"
+          },
+          "currentPassword": {
+            "$ref": "#/components/schemas/CredentialPassword"
+          }
+        },
+        "description": "Provide at least one of username, displayName, or password. Only the owner may update an account. Supplying username or password requires the correct currentPassword; an incorrect current password returns 401. A password change revokes other sessions and issues a fresh session for the current client. Unknown fields, including role, return 400.",
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "required": [
+              "username"
+            ]
+          },
+          {
+            "required": [
+              "displayName"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "not": {
+                  "required": [
+                    "username"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "currentPassword"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "not": {
+                  "required": [
+                    "password"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "currentPassword"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 2000
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents.",
+            "maximum": 10000000
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "description",
+          "priceCents",
+          "stock",
+          "active"
+        ]
+      },
+      "ProductCreateRequest": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 2000
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents.",
+            "maximum": 10000000
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "sku",
+          "name",
+          "priceCents",
+          "stock"
+        ],
+        "additionalProperties": false
+      },
+      "ProductUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 2000
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents.",
+            "maximum": 10000000
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "description": "Provide at least one documented product field. Unknown fields return 400.",
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "EmptyObject": {
+        "type": "object",
+        "maxProperties": 0,
+        "additionalProperties": false
+      },
+      "CartItemInput": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ],
+        "additionalProperties": false
+      },
+      "CartUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/CartItemInput"
+            },
+            "description": "Replaces all items. At most 100 entries with distinct productId values; duplicates return 400. An empty array clears the cart."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "CartItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents.",
+            "maximum": 10000000
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "lineTotalCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents."
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "priceCents",
+          "quantity",
+          "stock",
+          "active",
+          "lineTotalCents"
+        ]
+      },
+      "Cart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CartItem"
+            }
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "items",
+          "totalCents"
+        ]
+      },
+      "PaymentSimulation": {
+        "type": "string",
+        "enum": [
+          "success",
+          "fail"
+        ],
+        "description": "Selects a simulated payment outcome. Omitted means success; null is invalid and returns 400. No real charge is made; never provide payment card data.",
+        "default": "success"
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "properties": {
+          "simulatePayment": {
+            "$ref": "#/components/schemas/PaymentSimulation"
+          },
+          "note": {
+            "$ref": "#/components/schemas/Note"
+          }
+        },
+        "additionalProperties": false
+      },
+      "OrderCreateRequest": {
+        "type": "object",
+        "properties": {
+          "cartId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "simulatePayment": {
+            "$ref": "#/components/schemas/PaymentSimulation"
+          },
+          "note": {
+            "$ref": "#/components/schemas/Note"
+          }
+        },
+        "required": [
+          "cartId"
+        ],
+        "additionalProperties": false
+      },
+      "OrderUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          },
+          "note": {
+            "$ref": "#/components/schemas/Note"
+          }
+        },
+        "description": "Update the note, cancel the order, or both. Cancellation restores stock exactly once and changes paymentStatus to simulated_refunded. Cancelled orders cannot be reactivated.",
+        "additionalProperties": false,
+        "minProperties": 1
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents.",
+            "maximum": 10000000
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "lineTotalCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents."
+          }
+        },
+        "required": [
+          "productId",
+          "name",
+          "priceCents",
+          "quantity",
+          "lineTotalCents"
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "placed",
+              "cancelled"
+            ]
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "simulated_paid",
+              "simulated_refunded"
+            ]
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in integer cents."
+          },
+          "note": {
+            "$ref": "#/components/schemas/Note"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "status",
+          "paymentStatus",
+          "totalCents",
+          "note",
+          "createdAt",
+          "items"
+        ]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          }
+        },
+        "required": [
+          "users"
+        ]
+      },
+      "ProductResponse": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/Product"
+          }
+        },
+        "required": [
+          "product"
+        ]
+      },
+      "ProductListResponse": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            }
+          }
+        },
+        "required": [
+          "products"
+        ]
+      },
+      "CartResponse": {
+        "type": "object",
+        "properties": {
+          "cart": {
+            "$ref": "#/components/schemas/Cart"
+          }
+        },
+        "required": [
+          "cart"
+        ]
+      },
+      "CartListResponse": {
+        "type": "object",
+        "properties": {
+          "carts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Cart"
+            }
+          }
+        },
+        "required": [
+          "carts"
+        ]
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          }
+        },
+        "required": [
+          "order"
+        ]
+      },
+      "OrderListResponse": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            }
+          }
+        },
+        "required": [
+          "orders"
+        ]
+      },
+      "Username": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 32,
+        "pattern": "^[A-Za-z0-9_-]{3,32}$",
+        "description": "ASCII letters, digits, underscores, and hyphens. Normalized to lowercase."
+      },
+      "DisplayName": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "pattern": "\\S"
+      },
+      "Note": {
+        "type": "string",
+        "minLength": 0,
+        "maxLength": 500
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request body or parameter.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Login is required, or supplied credentials are invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "PaymentRequired": {
+        "description": "Simulated payment failed. Cart, stock, and orders remain unchanged.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Administrator access is required, or the supplied Origin header is not allowed for a mutating request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource does not exist, is inactive where active resources are required, is not accessible to this user, or the path ID is invalid. Other users’ protected resources return 404.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflict with current state, such as duplicate username or SKU, an existing cart, an empty cart, insufficient stock, an inactive product, or a prohibited deletion or order transition.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "JSON request body exceeds 64 KB.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "A supplied request body must use application/json.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "An unexpected server or database error occurred.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

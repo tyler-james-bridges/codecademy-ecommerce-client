@@ -1,0 +1,34 @@
+{
+  "name": "course-ecommerce-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PostgreSQL ecommerce API and React client with GitHub sign-in and Stripe sandbox checkout",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "db:setup": "node scripts/db.js",
+    "db:test:setup": "node scripts/db.js --test",
+    "seed": "node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 test/api.test.js test/oauth.test.js test/payments.test.js",
+    "test:oauth": "node --test test/oauth.test.js",
+    "test:payments": "node --test test/payments.test.js",
+    "build:client": "npm --prefix client run build",
+    "db:deploy": "node scripts/db.js --catalog"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^18.0.5",
+    "express": "^4.22.3",
+    "express-session": "^1.19.0",
+    "pg": "^8.23.1",
+    "stripe": "^23.0.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  }
+}
