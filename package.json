@@ -9,7 +9,7 @@
     "db:setup": "node scripts/db.js",
     "db:test:setup": "node scripts/db.js --test",
     "seed": "node scripts/seed.js",
-    "test": "node --test --test-concurrency=1 test/api.test.js test/oauth.test.js test/payments.test.js",
+    "test": "node --test --test-concurrency=1 test/api.test.js test/oauth.test.js test/payments.test.js test/stripe-client.test.js",
     "test:oauth": "node --test test/oauth.test.js",
     "test:payments": "node --test test/payments.test.js",
     "build:client": "npm --prefix client run build",

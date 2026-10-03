@@ -27,7 +27,7 @@ The active runtime copy is under `/private/tmp/codex-ecommerce-source-a4cddb` to
 - Accounts use PostgreSQL-backed sessions. Registration signs in, login rotates the session, and logout clears it. Protected pages return through a validated local login destination.
 - Cart quantities are 1–99; prices and totals use integer cents. The server checks ownership, current stock and current prices. Cart updates replace all lines.
 - Without configured Stripe credentials, **development-only simulated checkout** is explicit in the UI. No card is collected and no money is charged. Its database transaction either saves the order, adjusts stock and clears the cart together, or rolls everything back.
-- Configured Stripe uses **test-mode hosted Checkout only**, USD/card payments and a $0.50 minimum. It never accepts a live key or live-mode event. The result is labeled “Stripe test payment verified · no real charge.” Orders stay pending until trusted provider verification.
+- Configured Stripe uses **test-mode hosted Checkout only**, USD/card payments and a $0.50 minimum. Requests explicitly use API version `2026-08-26.dahlia`; the [Endive breaking change](https://docs.stripe.com/changelog#2026-09-30.endive) removed the explicit payment-method parameter used by this card-only integration. It never accepts a live key or live-mode event. The result is labeled “Stripe test payment verified · no real charge.” Orders stay pending until trusted provider verification.
 - Pending Stripe orders reserve stock for their one-hour provider session. Cancellation expires the provider session before releasing the reservation. An uncertain provider response keeps the reservation; retry the same cart instead of assuming payment failed. Unresolved sessions need trusted provider reconciliation. Paid Stripe orders cannot use the simulated cancellation/refund path; a Stripe refund integration is not included.
 
 Shipping, tax calculation, password recovery and production operations are outside this course implementation.
@@ -58,7 +58,7 @@ npm --prefix client test   # Cart bounds and safe auth-return logic
 npm run build:client       # Production client build
 ```
 
-All 36 backend test groups passed against the dedicated PostgreSQL test database. The client production build and two cart/redirect tests passed. Browser verification passed registration, protected-page redirection, product search/details, a two-item cart surviving reload, a $17.98 simulated order, order history, logout and returning-user login. Provider tests inject controlled GitHub/Stripe responses; payment tests also exercise Stripe’s real webhook signature verifier. These checks do **not** establish a completed external provider round trip.
+All 36 backend test groups passed against the dedicated PostgreSQL test database. The client production build and two cart/redirect tests passed. Browser verification passed registration, protected-page redirection, product search/details, a two-item cart surviving reload, a $17.98 simulated order, order history, logout and returning-user login. Provider tests inject controlled GitHub/Stripe responses; payment tests also exercise Stripe’s real webhook signature verifier. A focused SDK regression also verifies the pinned outgoing API-version header and preserves the request body and idempotency key when retrying after a validation error. These checks do **not** establish a completed external provider round trip.
 
 The following remain pending real credentials, authorization and external verification:
 
