@@ -58,10 +58,19 @@ npm --prefix client test   # Cart bounds and safe auth-return logic
 npm run build:client       # Production client build
 ```
 
-All 36 backend test groups passed against the dedicated PostgreSQL test database. The client production build and two cart/redirect tests passed. Browser verification passed registration, protected-page redirection, product search/details, a two-item cart surviving reload, a $17.98 simulated order, order history, logout and returning-user login. Provider tests inject controlled GitHub/Stripe responses; payment tests also exercise Stripe’s real webhook signature verifier. A focused SDK regression also verifies the pinned outgoing API-version header and preserves the request body and idempotency key when retrying after a validation error. These checks do **not** establish a completed external provider round trip.
+The original 36 backend test groups passed against the dedicated PostgreSQL test database, along with the client production build and two cart/redirect tests. The latest payment recovery change passed 19 focused payment/SDK cases, including concurrent recovery, one-time renewal, unchanged retries after uncertain errors, and the pinned Stripe API header. The full suite was not rerun for that server-only change. Local browser checks also covered registration, protected routes, product search/details, cart persistence, simulated checkout, order history, logout and returning-user login.
 
-The following remain pending real credentials, authorization and external verification:
+The deployed course demo is [Desk & Dwelling](https://codecademy-storefront-tjb.onrender.com). Render deployment `82d5636` and the following external flows were verified on October 3, 2026:
 
-- **GitHub:** register/authorize an OAuth app and set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and the exact callback URL. The implementation requests public identity only and never links accounts by matching a username/email. The client explains when GitHub sign-in is not configured.
-- **Stripe sandbox:** supply a test secret key and webhook secret. Configure `checkout.session.completed` and `checkout.session.expired` at `/api/payments/webhook`, then verify hosted Checkout, return confirmation, cancellation and signed webhooks against Stripe. No live charges are supported.
-- **Render:** review `render.yaml`, choose the repository/account, set the actual HTTPS `APP_ORIGIN` and private environment values, then authorize deployment. The deployment setup seeds only the public catalog, not an administrator. Production disables simulated checkout. No hosted deployment has been completed or verified.
+- **GitHub:** public-identity consent, sign-in, session persistence after reload, sign-out, and repeat sign-in. The app does not link accounts by matching usernames or email addresses.
+- **Stripe sandbox:** order 1 opened hosted Checkout; returning without payment canceled the order and retained the $8.99 notebook in the bag. Re-entering checkout created order 2; a test-card payment placed it, displayed “Stripe test payment verified · no real charge,” and emptied the bag.
+- **Signed webhooks:** Stripe recorded HTTP 200 responses for `checkout.session.expired` at 13:34:58 UTC and `checkout.session.completed` at 13:35:28 UTC. These were sandbox events; no live payment was made.
+- **Hosted API:** database health, the five-product catalog, secure session cookies, registration/login, authenticated reload, and logout/session revocation were verified. Production disables simulated checkout.
+
+## Deployed configuration
+
+The current Render service uses a dedicated `ecommerce_course` database on the existing shared PostgreSQL instance, reached through an external connection with `sslmode=verify-full`. `render.yaml` is an alternative fresh-install blueprint that provisions its own database; it is not a record of the deployed infrastructure.
+
+Build: `npm ci && npm --prefix client ci --include=dev && npm --prefix client run build`. Start: `npm run db:deploy && npm start`. Health check: `/health`. Runtime: Node 24.21.0, `NODE_ENV=production`, and `APP_ORIGIN=https://codecademy-storefront-tjb.onrender.com`.
+
+Private settings are `DATABASE_URL`, `SESSION_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`, `STRIPE_SECRET_KEY`, and `STRIPE_WEBHOOK_SECRET`. The GitHub callback is `/api/auth/github/callback` on the deployed origin; the Stripe webhook is `/api/payments/webhook`. Keep credentials in private environment settings. The deployment migration preserves existing stock and adds only the fictional catalog when missing; it does not create an administrator. Stripe remains test-only, and refunds are not implemented.

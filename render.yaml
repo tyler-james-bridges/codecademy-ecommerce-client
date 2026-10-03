@@ -1,5 +1,6 @@
-# Prepared deployment blueprint. Applying it provisions public hosting and a DB;
-# do so only after approval. GitHub/Stripe credentials are optional manual settings.
+# Fresh-install blueprint; the deployed service uses a dedicated database on
+# an existing shared instance instead. See README.md for the verified deployment.
+# Applying this template provisions a separate web service and database.
 services:
   - type: web
     name: course-ecommerce-client
